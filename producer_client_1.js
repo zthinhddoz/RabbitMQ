@@ -24,7 +24,7 @@ async function sendMessageProc (docData) {
     
     // Send message to exchange (publish to the exchange)
     console.log('------ Extracting documents --------');
-    await sleep(10000);
+    await sleep(15000);
     console.log('!!! EXTRACTION DONE !!!');
     console.log('Sending reuslt to SHINE PF');
     channel.publish(exchangeName, routingKey, Buffer.from(docData));
