@@ -12,7 +12,7 @@ let connection;
 async function receiveMessageProc() {
     try {
         // Need a connection to rabbitMQ
-        connection = await amqplib.connect(`amqp://10.0.26.200:5672/test`, opt);
+        connection = await amqplib.connect(`amqp://10.0.26.200:5672/main`, opt);
         // Need a channel (pipeline to rabbitMQ)
         const channel = await connection.createChannel();
         /**
