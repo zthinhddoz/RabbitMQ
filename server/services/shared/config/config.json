@@ -1,0 +1,67 @@
+{
+  "development": {
+    "username": "admin",
+    "password": "Qwer1234",
+    "database": "shinev2_development",
+    "host": "10.0.26.200",
+    "port": "5551",
+    "dialect": "postgres",
+    "logging": false,
+    "timestamps": true,
+    "sync": {
+      "force": true
+    }
+  },
+  "factory": {
+    "username": "admin",
+    "password": "Qwer1234",
+    "database": "shinev2_factory",
+    "host": "10.0.26.200",
+    "port": "5552",
+    "dialect": "postgres",
+    "logging": false,
+    "timestamps": true,
+    "sync": {
+      "force": true
+    }
+  },
+  "test": {
+    "username": "admin",
+    "password": "Qwer1234",
+    "database": "shinev2_test",
+    "host": "10.0.26.100",
+    "port": "5553",
+    "dialect": "postgres",
+    "logging": false,
+    "timestamps": true,
+    "sync": {
+      "force": true
+    }
+  },
+  "staging": {
+    "username": "admin",
+    "password": "Qwer1234",
+    "database": "shinev2_staging",
+    "host": "10.0.26.100",
+    "port": "5554",
+    "dialect": "postgres",
+    "logging": false,
+    "timestamps": true,
+    "sync": {
+      "force": true
+    }
+  },
+  "production": {
+    "username": "admin",
+    "password": "Qwer1234",
+    "database": "shinev2_production",
+    "host": "10.0.26.100",
+    "port": "5555",
+    "dialect": "postgres",
+    "logging": false,
+    "timestamps": true,
+    "sync": {
+      "force": true
+    }
+  }
+}
