@@ -19,7 +19,7 @@ async function receiveMessageProc() {
          * 
          * durable basically means when rabbitMQ is restarted (service restarted). 
          * + False: not re-create the queue again
-         * + True: It will re-check the queue, and re-create the queue. 
+         * + True: It will re-check the queue, and re-create the queue.
          * Different from 'persistence'
          */
         channel.assertExchange(exchangeName, 'topic', {

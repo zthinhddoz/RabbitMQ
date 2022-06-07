@@ -29,7 +29,9 @@ async function sendMessageProc (docData) {
     console.log('Sending reuslt to SHINE PF');
     console.log('DOC INFO: ', docData);
     try {
-        const dataRes = await ExtractionServices.saveExtractDocument(docData, docData.root_nm);
+        const data = JSON.parse(docData);
+        console.log('data: ', data);
+        const dataRes = await ExtractionServices.extractDocument(data, false, true);
         console.log('dataRes: ', dataRes);
     } catch (err) {
         console.log('err: ', err);
