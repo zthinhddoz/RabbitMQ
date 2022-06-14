@@ -284,6 +284,7 @@ export default class ExtractionServices {
       tmplt_type: tmpType,
       doc_id: docId,
       extract_json: extractJson,
+      usrId,
     };
     return this.dataRes;
   }

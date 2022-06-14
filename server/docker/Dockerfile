@@ -1,5 +1,5 @@
 FROM ubuntu:18.04
-EXPOSE 3000-3010 7005
+EXPOSE 3000-3010 7006
 WORKDIR /root
 RUN apt-get update --fix-missing
 RUN apt-get -y install bash sudo curl net-tools gnupg gnupg1 gnupg2 build-essential
