@@ -24,7 +24,6 @@ async function sendMessageProc (docData) {
     await channel.assertExchange(exchangeName, 'topic', {durable: true});
     // Send message to exchange (publish to the exchange)
     console.log('------ Extracting documents --------');
-    await sleep(5000);
     console.log('!!! EXTRACTION DONE !!!');
     console.log('Sending reuslt to SHINE PF');
     console.log('DOC INFO: ', docData);
