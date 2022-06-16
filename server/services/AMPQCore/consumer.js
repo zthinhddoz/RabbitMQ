@@ -1,6 +1,6 @@
 const amqplib = require('amqplib');
 const core_producer = require('./producer_client_1');
-
+import chalk from 'chalk';
 
 // Create a queue name - routing id
 const queueNameShine = "data_from_shine";
@@ -13,6 +13,7 @@ async function receiveMessageProc() {
     try {
         // Need a connection to rabbitMQ
         connection = await amqplib.connect(`amqp://10.0.26.200:5672/main`, opt);
+        console.log(chalk.hex('#009688')('🚀 RabbitMQ server: Connection Succeeded.'));
         // Need a channel (pipeline to rabbitMQ)
         const channel = await connection.createChannel();
         /**
@@ -33,8 +34,6 @@ async function receiveMessageProc() {
          * Exchange Type (default: 'direct')
          * Direct: using the routing id & queueName
          */
-        console.log('==== CORE SERVICES ====');
-        console.log(`[X] Receiving messages from queue: ${queueNameShine}`);
         // Consume the message in the queue
         channel.bindQueue(queueNameShine, exchangeName, routingKey);
         channel.consume(queueNameShine, msg => {
