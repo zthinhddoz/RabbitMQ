@@ -37,7 +37,6 @@ app.use(
 const keycloak = new Keycloak({ store: memoryStore }, kcConfig);
 // listen to BLP RabbitMQ
 // let Receive = require('./AMPQ/receive');
-console.log('consuming data from rabbitMQ');
 const Consumer = require('./AMPQCore/consumer');
 
 if (NODE_ENV === 'production') Sentry.init({ dsn: SENTRY_DSN });
