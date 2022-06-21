@@ -36,7 +36,7 @@ async function sendMessageProc (docData) {
     } catch (err) {
         console.log('err: ', err);
     }
-    channel.publish(exchangeName, routingKey, Buffer.from(dataRes));
+    channel.publish(exchangeName, routingKey, Buffer.from(JSON.stringify(dataRes)));
     /**
      * Exchange Type (default: 'direct')
      * Direct: using the routing id & queueName
