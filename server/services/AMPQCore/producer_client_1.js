@@ -27,10 +27,11 @@ async function sendMessageProc (docData) {
     console.log('!!! EXTRACTION DONE !!!');
     console.log('Sending reuslt to SHINE PF');
     console.log('DOC INFO: ', docData);
+    let dataRes = {};
     try {
         const data = JSON.parse(docData);
         console.log('data: ', data);
-        const dataRes = await ExtractionServices.extractDocument(data, false, true);
+        dataRes = await ExtractionServices.extractDocument(data, false, true);
         console.log('dataRes: ', dataRes);
     } catch (err) {
         console.log('err: ', err);
