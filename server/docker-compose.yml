@@ -11,6 +11,17 @@ services:
       - .env
     ports:
       - ${REDIS_PORT}:6379
+  rabbitmq-extr:
+    image: 'rabbitmq:3.10-management'
+    container_name: DoEx-rabbitmq-extraction-${NODE_ENV}
+    restart: always
+    volumes:
+      - ../database/rabbitmq/rabbitmq-extraction-${NODE_ENV}:/data
+    env_file:
+      - .env
+    ports:
+      - ${AMQP_PORT_CORE}:5672
+      - ${AMQP_PORT_MNGT}:15672
   postgres-db:
     image: 'postgres:11'
     container_name: 'DoEx-postgres-${NODE_ENV}'
@@ -27,7 +38,6 @@ services:
     image: service:latest
     container_name: 'DoEx-service-${NODE_ENV}'
     restart: always
-    command: ['yarn', 'serve']
     build:
       context: .
       dockerfile: Dockerfile
@@ -36,3 +46,6 @@ services:
     ports:
       - ${PORT}:3000
     tty: true
+    depends_on:
+      postgres-db:
+        condition: service_healthy

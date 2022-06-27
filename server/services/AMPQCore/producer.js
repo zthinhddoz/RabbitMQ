@@ -1,10 +1,11 @@
 const amqplib = require('amqplib');
+const config = require('./config');
 import ExtractionServices from '../extraction/ExtractionServices';
+import chalk from 'chalk';
+import logger from '../shared/logger';
 
-// Create a queue name - routing id
-const exchangeName = "shinepf.topic";
-const routingKey = "shinepf.core"
-const opt = { credentials: amqplib.credentials.plain('admin', 'admin') };
+// Rabbit Authentication
+const opt = { credentials: require('amqplib').credentials.plain(config.amqp_user_name, config.amqp_password) };
 let connection;
 
 function convertTime (time) {
@@ -15,35 +16,39 @@ function convertTime (time) {
 
 // create a msg
 async function sendMessageProc (docData) {
-    // Need a connection to rabbitMQ
-    connection = await amqplib.connect(`amqp://10.0.26.200:5672/main`, opt);
-    // Need a channel (pipeline to rabbitMQ)
-    const channel = await connection.createChannel();
-    /**
-     * 
-     * durable basically means when rabbitMQ is restarted (service restarted). 
-     * + False: not re-create the queue again
-     * + True: It will re-check the queue, and re-create the queue. 
-     * Different from 'persistence'
-     */
-    await channel.assertExchange(exchangeName, 'topic', {durable: true});
-    // Send message to exchange (publish to the exchange)
-    console.log('------ Extracting documents --------');
-    console.log('!!! EXTRACTION DONE !!!');
-    console.log('------ Sending reuslt to SHINE PF --------');
-    let dataRes = {};
     try {
-        const data = JSON.parse(docData);
-        console.log('data: ', data);
-        const startExtTime = Date.now();
-        dataRes = await ExtractionServices.extractDocument(data, false, true);
-        const endExtTime = Date.now() - startExtTime;
-        console.log(`End of extraction for document: ${dataRes.doc_id} - time: ${convertTime(endExtTime)}`);
-        console.log('dataRes: ', dataRes);
+        // Need a connection to rabbitMQ
+        connection = await amqplib.connect(`amqp://${config.amqp_host}:${config.amqp_port}${config.amqp_virtual_host}`, opt);
+        // Need a channel (pipeline to rabbitMQ)
+        const channel = await connection.createChannel();
+        /**
+         * 
+         * durable basically means when rabbitMQ is restarted (service restarted). 
+         * + False: not re-create the queue again
+         * + True: It will re-check the queue, and re-create the queue. 
+         * Different from 'persistence'
+         */
+        await channel.assertExchange(config.amqp_exchange, 'topic', {durable: true});
+        // Send message to exchange (publish to the exchange)
+        console.log('------ Extracting documents --------');
+        console.log('!!! EXTRACTION DONE !!!');
+        console.log('------ Sending reuslt to SHINE PF --------');
+        let dataRes = {};
+        try {
+            const data = JSON.parse(docData);
+            console.log('data: ', data);
+            const startExtTime = Date.now();
+            dataRes = await ExtractionServices.extractDocument(data, false, true);
+            const endExtTime = Date.now() - startExtTime;
+            console.log(`End of extraction for document: ${dataRes.doc_id} - time: ${convertTime(endExtTime)}`);
+            console.log('dataRes: ', dataRes);
+        } catch (err) {
+            console.log('err: ', err);
+        }
+        channel.publish(config.amqp_exchange, config.amqp_routing_key_core, Buffer.from(JSON.stringify(dataRes)));
     } catch (err) {
-        console.log('err: ', err);
+        console.log(err);
     }
-    channel.publish(exchangeName, routingKey, Buffer.from(JSON.stringify(dataRes)));
 };
 
 

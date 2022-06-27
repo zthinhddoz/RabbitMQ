@@ -1,18 +1,17 @@
 const amqplib = require('amqplib');
+const config = require('./config');
 const core_producer = require('./producer');
 import chalk from 'chalk';
+import logger from '../shared/logger';
 
-// Create a queue name - routing id
-const queueNameShine = "data_from_shine";
-const exchangeName = "shinepf.topic";
-const routingKey = 'shinepf.local';
-const opt = { credentials: amqplib.credentials.plain('admin', 'admin') };
-
+// Rabbit Authentication
+const opt = { credentials: require('amqplib').credentials.plain(config.amqp_user_name, config.amqp_password) };
 let connection;
+
 async function receiveMessageProc() {
     try {
-        // Need a connection to rabbitMQ
-        connection = await amqplib.connect(`amqp://10.0.26.200:5672/main`, opt);
+        // Create connection
+        connection = await amqplib.connect(`amqp://${config.amqp_host}:${config.amqp_port}${config.amqp_virtual_host}`, opt);
         console.log(chalk.hex('#009688')('🚀 RabbitMQ server: Connection Succeeded.'));
         // Need a channel (pipeline to rabbitMQ)
         const channel = await connection.createChannel();
@@ -23,11 +22,11 @@ async function receiveMessageProc() {
          * + True: It will re-check the queue, and re-create the queue.
          * Different from 'persistence'
          */
-        channel.assertExchange(exchangeName, 'topic', {
+        channel.assertExchange(config.amqp_exchange, 'topic', {
             durable: true,
         });
 
-        await channel.assertQueue(queueNameShine, {
+        await channel.assertQueue(config.amqp_queue_name_shine, {
             durable: true,
         });
         /**
@@ -35,8 +34,8 @@ async function receiveMessageProc() {
          * Direct: using the routing id & queueName
          */
         // Consume the message in the queue
-        channel.bindQueue(queueNameShine, exchangeName, routingKey);
-        channel.consume(queueNameShine, msg => {
+        channel.bindQueue(config.amqp_queue_name_shine, config.amqp_exchange, config.amqp_routing_key_shine);
+        channel.consume(config.amqp_queue_name_shine, msg => {
             // Logging
             console.log(`[x] Message from key ${msg.fields.routingKey}`);
             core_producer.sendMessageProc(msg.content.toString());
