@@ -1,5 +1,5 @@
 const amqplib = require('amqplib');
-const core_producer = require('./producer_client_1');
+const core_producer = require('./producer');
 import chalk from 'chalk';
 
 // Create a queue name - routing id
