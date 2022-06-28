@@ -6,11 +6,12 @@ services:
     container_name: DoEx-redis-${NODE_ENV}
     restart: always
     volumes:
-      - ../database/redis:/data
+      - ../database/redis:/data:rw
     env_file:
       - .env
     ports:
       - ${REDIS_PORT}:6379
+
   rabbitmq-extr:
     image: 'rabbitmq:3.10-management'
     container_name: DoEx-rabbitmq-extraction-${NODE_ENV}
@@ -22,6 +23,7 @@ services:
     ports:
       - ${AMQP_PORT_CORE}:5672
       - ${AMQP_PORT_MNGT}:15672
+
   postgres-db:
     image: 'postgres:11'
     container_name: 'DoEx-postgres-${NODE_ENV}'
@@ -30,21 +32,23 @@ services:
       - .env
     ports:
       - ${POSTGRES_PORT}:5432
-    volumes:
-      - ../database/postgres/postgres-${NODE_ENV}:/var/lib/postgresql/data
+    #volumes:
+    #  - ../database/postgres/postgres-${NODE_ENV}:/var/lib/postgresql/data
     healthcheck:
       test: exit 0
+  
   service:
-    image: service:latest
+    image: doex-service:latest
     container_name: 'DoEx-service-${NODE_ENV}'
     restart: always
+    command: yarn start
     build:
       context: .
       dockerfile: Dockerfile
     env_file:
       - .env
     ports:
-      - ${PORT}:3000
+      - 3000:3000
     tty: true
     depends_on:
       postgres-db:
