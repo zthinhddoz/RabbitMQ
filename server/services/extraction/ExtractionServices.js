@@ -73,28 +73,28 @@ export default class ExtractionServices {
    * @param {*} fileData
    * @returns
    */
-  static async extractDocument(fileData, reExtract = false, updateTmplt = false) {
-    const { docId } = fileData;
-    if (!fileData && !docId) throw new Error('Extract File Info wrong!!!');
+   static async extractDocument(fileData, reExtract = false, updateTmplt = false) {
+    const { doc_id } = fileData;
+    if (!fileData && !doc_id) throw new Error('Extract File Info wrong!!!');
     let tmpType = '';
     let tmpId = '';
     let status = AppConstants.DOC_STATUS.NEED_MATCHING;
-    const fileUrl = fileData.fileUrl ? fileData.fileUrl : `${process.env.REACT_APP_DOC_LOC}${fileData.fileLoc}`;
+    const fileUrl = fileData.file_url ? fileData.file_url : `${process.env.REACT_APP_DOC_LOC}${fileData.fileLoc}`;
     let coreErrMsg = '';
     let extractJson = null;
-    const usrId = fileData.usrId || 'no-user';
+    const usrId = fileData.usr_id || 'no-user';
     try {
       const reqCoreMatching = {
-        doc_id: docId,
+        doc_id: doc_id,
         file_url: fileUrl,
-        co_cd: fileData.coCd,
-        lo_cd: fileData.locCd,
-        doc_tp_id: fileData.docTpId,
-        grp_val: fileData.grpVal || '',
+        co_cd: fileData.co_cd,
+        lo_cd: fileData.loc_cd,
+        doc_tp_id: fileData.doc_tp_id,
+        grp_val: fileData.grp_val || '',
         xlsx_url: fileData.xlsx_url || '',
         xls_url: fileData.xls_url || '',
       };
-      const matchingData = await CoreAdapterServices.runMatching(reqCoreMatching, fileData.docTpId).catch(err => {
+      const matchingData = await CoreAdapterServices.runMatching(reqCoreMatching, fileData.doc_tp_id).catch(err => {
         coreErrMsg = err;
         throw new Error('Could not matching!');
       });
@@ -113,13 +113,13 @@ export default class ExtractionServices {
       if (matchingData.is_annotated) {
         const reqCoreExtract = {
           file_url: fileUrl,
-          doc_id: docId,
+          doc_id: doc_id,
           tmp_type: tmpType,
           tmp_id: tmpId,
-          doc_tp_id: fileData.docTpId,
+          doc_tp_id: fileData.doc_tp_id,
           xls_url: fileData.xls_url || '',
         };
-        const extractedData = await CoreAdapterServices.runExtract(reqCoreExtract, fileData.docTpId).catch(err => {
+        const extractedData = await CoreAdapterServices.runExtract(reqCoreExtract, fileData.doc_tp_id).catch(err => {
           coreErrMsg = err;
           status = AppConstants.DOC_STATUS.FAILED;
           throw err;
@@ -128,9 +128,9 @@ export default class ExtractionServices {
         // APPLY API MANAGE DATA INTO EXTRACTED DATA
         // Call API data configuration
         const reqAPIConfig = {
-          co_cd: fileData.coCd,
-          loc_cd: fileData.locCd,
-          doc_tp_id: fileData.docTpId,
+          co_cd: fileData.co_cd,
+          loc_cd: fileData.loc_cd,
+          doc_tp_id: fileData.doc_tp_id,
           delt_flg: 'N',
           cre_usr_id: usrId,
         };
@@ -244,8 +244,8 @@ export default class ExtractionServices {
 
         const saveExtractRes = await DocDataServices.saveExtractionData(
           extractedData.data,
-          fileData.docTpId,
-          docId,
+          fileData.doc_tp_id,
+          doc_id,
         ).catch(err => {
           coreErrMsg = 'Save Extraction Data Failed!';
           status = AppConstants.DOC_STATUS.FAILED;
@@ -253,21 +253,21 @@ export default class ExtractionServices {
         });
         if (saveExtractRes) {
           status = AppConstants.DOC_STATUS.EXTRACTED;
-          await DocDataServices.updateTemplateIdForDoc(docId, tmpId, usrId).catch(err => next(err));
-          const extractRuleRes = await processRunExtrRuleByDoc(docId);
-          await DocDataServices.updateDocExtracData(docId, null, extractRuleRes, null);
-          const bizRes = await processRunBizRuleByDoc(docId);
-          await DocDataServices.updateBizData(docId, bizRes);
+          await DocDataServices.updateTemplateIdForDoc(doc_id, tmpId, usrId).catch(err => next(err));
+          const extractRuleRes = await processRunExtrRuleByDoc(doc_id);
+          await DocDataServices.updateDocExtracData(doc_id, null, extractRuleRes, null);
+          const bizRes = await processRunBizRuleByDoc(doc_id);
+          await DocDataServices.updateBizData(doc_id, bizRes);
           if (fileData.smartLink) {
-            const renderableData = await DocDataServices.getRenderableData(docId);
+            const renderableData = await DocDataServices.getRenderableData(doc_id);
             extractJson = renderableData.extractedData.aft_biz_ctnt;
           }
         }
       } else if (updateTmplt) {
-        matchingData.co_cd = fileData.coCd;
-        [tmpType, tmpId] = await this.updateMatchingForTmplt(matchingData, fileData.docTpId, usrId);
+        matchingData.co_cd = fileData.co_cd;
+        [tmpType, tmpId] = await this.updateMatchingForTmplt(matchingData, fileData.doc_tp_id, usrId);
       }
-      await this.updateDocData(reExtract, docId, tmpId, status, usrId);
+      await this.updateDocData(reExtract, doc_id, tmpId, status, usrId);
     } catch (error) {
       logger.error(error);
     }
@@ -275,16 +275,15 @@ export default class ExtractionServices {
     const viewExtUrl = process.env.CLIENT_URL + AppConstants.CLIENT_URL.VIEW_EXT;
     this.dataRes = {
       sts_cd: 200,
-      extract_url: `${viewExtUrl}/${docId}`,
+      extract_url: `${viewExtUrl}/${doc_id}`,
       annotate_url: annotateUrl,
       status,
       file_url: fileUrl,
       reason: coreErrMsg, // TODO: Define if need
       tmplt_id: tmpId,
       tmplt_type: tmpType,
-      doc_id: docId,
+      doc_id: doc_id,
       extract_json: extractJson,
-      usrId,
     };
     return this.dataRes;
   }
@@ -301,13 +300,13 @@ export default class ExtractionServices {
 
   static async makeExtractDocData(saveDocInfo, usrId, isSmartLink = false) {
     const docExtractData = {
-      docId: saveDocInfo.doc_id,
-      fileUrl: saveDocInfo.file_url,
-      coCd: saveDocInfo.co_cd,
-      locCd: saveDocInfo.loc_cd,
-      docTpId: saveDocInfo.doc_type,
-      grpVal: saveDocInfo.grp_val || '',
-      usrId,
+      doc_id: saveDocInfo.doc_id,
+      file_url: saveDocInfo.file_url,
+      co_cd: saveDocInfo.co_cd,
+      loc_cd: saveDocInfo.loc_cd,
+      doc_tp_id: saveDocInfo.doc_type,
+      grp_val: saveDocInfo.grp_val || '',
+      usr_id: usrId,
       xlsx_url: saveDocInfo.xlsx_url || '',
       xls_url: saveDocInfo.xls_url || '',
     };
