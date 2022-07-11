@@ -6,9 +6,11 @@ const fs = require('fs');
 // import model from '~/shared/models';
 
 export default class FrameTableSercive {
-  static KEY_FRAME_NO = ['NO.', 'FR.NO.', 'FR.NO', 'Frame', 'No.', 'Framing'];
-  static KEY_AP = ['A.P.', 'x-coord.', 'FROM AP', '(m) AP', 'AP', 'From A.P. (m)'];
-  static EOL = '+';
+  static KEY_FRAME_NO = ['NO.', 'FR.NO.', 'FR.NO', 'Frame', 'No.', 'Framing', 'FRN'];
+  static KEY_AP = ['A.P.', 'x-coord.', 'FROM AP', '(m) AP', 'AP', 'From A.P. (m)', 'X'];
+  static KEY_FRAME = ['Up To Frame'];
+  static KEY_SPACING = ['Spacing'];
+  static EOL = '+\r';
   static SEPARATOR = '^';
   static FRAME_LIST = "Frame List";
   constructor() {
@@ -21,7 +23,7 @@ export default class FrameTableSercive {
   static async getDataByIndex (gridData, idxFrameNo, idxAp, measureUnit) {
     const objectData = {};
     for (const row of gridData) {
-        if ((/\d/.test(row [0]) || (/\d/.test(row [1]) || ((/\d/.test(row [2])) && (/\d/.test(row [3]))))) && row.length > idxFrameNo.length + idxAp.length) {
+        if ((/\d/.test(row [0]) || (/\d/.test(row [1]) || ((/\d/.test(row [2])) && (/\d/.test(row [3])))))) {
             for (const idx in idxFrameNo) {
                 if (row[idxFrameNo[idx]] && !isNaN(row[idxFrameNo[idx]]) && row[idxAp[idx]]) {
                     const distanceAp = measureUnit === 'mm' ? row[idxAp[idx]]/1000 : row[idxAp[idx]];
@@ -31,6 +33,33 @@ export default class FrameTableSercive {
         }
     }
     return objectData;
+  }
+  static async getDataByIndexSpecialCase (gridData, idxFrame, idxSpacing) {
+    const objectData = {};
+    for (const row of gridData) {
+      if ((/\d/.test(row [0]) || (/\d/.test(row [1]) || ((/\d/.test(row [2])) && (/\d/.test(row [3]))))) && row.length > idxFrame.length + idxSpacing.length) {
+        for (const idx in idxFrame) {
+          let valFrame = row[idxFrame[idx]];
+          valFrame = valFrame ? valFrame.split('(') : '';
+          valFrame = valFrame ? valFrame[valFrame.length-1] : '';
+          valFrame = valFrame.includes(')') ? valFrame.slice(0, -1) : valFrame;
+          objectData[valFrame] = row[idxSpacing[idx]];
+        }
+      }
+    }
+    const listKeySorted = Object.keys(objectData).sort(function(a, b){return a - b});
+    let valAp = 0;
+    let valFrame = 0;
+    const objectResult = {};
+    listKeySorted.forEach(function (v, k) {
+      objectResult[valFrame] = parseFloat(valAp);
+      while (valFrame < v) {
+        valFrame += 1;
+        valAp += parseFloat(objectData[v]);
+        objectResult[valFrame] = valAp;
+      }
+    });
+    return objectResult;
   }
   static async convertToCVPFormat (data) {
       // Frame List = frame_no(0.000)^ap(0.00)^...+
@@ -82,7 +111,7 @@ export default class FrameTableSercive {
     result = await result.replace(',99,241.830,,', ',99,,241.830,,');
     result = await result.replace(',100,242.660,,', ',100,,242.660,,');
     result = await result.replace(',101,243.490,,', ',101,,243.490,,');
-    result = await result.replace('FRAME,,FRAME SPACE,,SPACE A.P,MIDSHIP,F.P,,A.P,MIDSHIP,F.P', 'NO.,FRAME SPACE,A.P.,MIDSHIP,,NO.,FRAME,A.P.,MIDSHIP,F.P');
+    result = await result.replace('FRAME,FRAME SPACE,SPACE A.P,MIDSHIP,F.P,A.P,MIDSHIP,F.P', 'NO.,FRAME SPACE,A.P.,MIDSHIP,,NO.,FRAME,A.P.,MIDSHIP,F.P');
     return result;
   }
   static async getFrameTableData(data) {
@@ -91,39 +120,53 @@ export default class FrameTableSercive {
     const gridData = [];
     let idxFrameNo = [];
     let idxAp = [];
+    let idxFrame = [];
+    let idxSpacing = [];
     let result = '';
     for (const row of cleanedData.split('\n')) {
-        const checkIdxFrameNo = idxFrameNo.length > 0 ? false : true;
-        const checkIdxAp = idxAp.length > 0 ? false : true;
-        const arrData = [];
-        const rowData = row.split(',');
-        for(const idxItem in rowData) {
-            if (rowData[idxItem] === 'mm') {
-                measureUnit = 'mm';
+      const checkIdxFrameNo = idxFrameNo.length > 0 ? false : true;
+      const checkIdxAp = idxAp.length > 0 ? false : true;
+      const checkIdxFrame = idxFrame.length > 0 ? false : true;
+      const checkIdxSpace = idxSpacing.length > 0 ? false : true;
+      const rowData = row.split(',');
+      for(const idxItem in rowData) {
+          if (rowData[idxItem] === 'mm') {
+              measureUnit = 'mm';
+          }
+          if (checkIdxFrameNo) {
+              if (this.KEY_FRAME_NO.includes(rowData[idxItem])) {
+                  idxFrameNo.push(idxItem);
+              }
+          }
+          if (checkIdxAp) {
+              if (this.KEY_AP.includes(rowData[idxItem])) {
+                  idxAp.push(idxItem);
+              }
+          }
+          if (checkIdxFrame) {
+            if (this.KEY_FRAME.includes(rowData[idxItem])) {
+              idxFrame.push(idxItem);
             }
-            arrData.push(rowData[idxItem]);
-            if (checkIdxFrameNo) {
-                if (this.KEY_FRAME_NO.includes(rowData[idxItem])) {
-                    idxFrameNo.push(idxItem);
-                }
+          }
+          if (checkIdxSpace) {
+            if (this.KEY_SPACING.includes(rowData[idxItem])) {
+              idxSpacing.push(idxItem);
             }
-            if (checkIdxAp) {
-                if (this.KEY_AP.includes(rowData[idxItem])) {
-                    idxAp.push(idxItem);
-                }
-            }
+          }
         }
         if (idxFrameNo.length < 2) idxFrameNo = [];
         if (idxAp.length < 2) idxAp = [];
-        gridData.push(arrData);
+        gridData.push(rowData);
     }
     idxFrameNo.sort(function(a, b){return a - b});
     idxAp.sort(function(a, b){return a - b});
     if (idxFrameNo.length && idxAp.length && idxFrameNo.length === idxAp.length) {
         result = await this.getDataByIndex(gridData, idxFrameNo, idxAp, measureUnit);
+    } else if (idxFrame && idxSpacing) {
+      result = await this.getDataByIndexSpecialCase(gridData, idxFrame, idxSpacing);
     }
     if (result) {
-        result = await this.convertToCVPFormat(result, measureUnit);
+        result = await this.convertToCVPFormat(result);
     }
     return result;
   }

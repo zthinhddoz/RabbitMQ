@@ -19,31 +19,38 @@ const AppConstants = {
   },
   SCOPES: ['https://www.googleapis.com/auth/drive.readonly'],
   EXCLUDE_MIMETYPE: ['application/vnd.google-apps.folder'],
-  INCLUDE_FILE_TYPES: [
-    '.pdf',
-    '.txt',
-    '.xls', // file excel
-    '.xlsx',
-    '.csv',
-    '.xlsm',
-    '.xlsb',
-    '.ods', // -------------
-    '.doc', // file word
-    '.docx',
-    '.odt', //----------
-    '.png', // File image
-    '.jpg',
-    '.jpeg',
-    '.jfif',
-    '.pjpeg',
-    '.pjp', //-----------
-  ],
+  // mimeType list reference: https://github.com/google/google-drive-proxy/blob/master/DriveProxy/API/MimeType.cs
+  INCLUDE_TYPE_MIMETYPE_MAPPING : {
+    '.pdf': 'application/pdf',
+    '.txt': 'plain/text',
+    '.xls': 'application/vnd.ms-excel', // file excel
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.csv': 'text/csv',
+    '.xlsm': 'application/vnd.ms-excel.sheet.macroEnabled.12',
+    '.xlsb': 'application/vnd.ms-excel.sheet.binary.macroEnabled.12',
+    '.ods': 'application/oleobject', // -------------
+    '.doc': 'application/msword', // file word
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.odt': 'application/vnd.oasis.opendocument.text', //----------
+    '.png': 'image/png', // File image
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.jfif': 'image/pjpeg',
+    '.pjpeg': '',
+    '.pjp': '', //-----------
+  },
   LOCATION_DOC_FILE: './file',
   LOCATION_GDRIVE_KEY: './googleDriveKeys',
   FILE_TYPE_DOC_UPLOAD: ['.pdf', '.cvp', '.xls', '.xlsx', '.png', '.jpg', '.jpeg'],
   FILE_TYPE_DOC_IMG: ['png', 'jpg', 'jpeg', 'bmp'],
   FILE_TYPE_DOC_EXCEL: ['xls', 'xlsx'],
   FILE_TYPE_JSON_UPLOAD: '.json',
+  DOC_FILE_TYPE: {
+    IMAGE: 'img',
+    PDF: 'pdf',
+    EXCEL_XLS: 'xls',
+    EXCEL_XLSX: 'xlsx',
+  },
   TRANSACTION: {
     VERIFY: 'VERIFY',
     RE_APPLY_BIZ: 'RE_APPLY_BIZ',

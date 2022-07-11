@@ -231,3 +231,19 @@ export const modifyCoreReqData = (coreName, reqData) => {
   }
   return reqData;
 };
+
+export const getFullPathForAllFileTypes = async data => {
+  if (!data || !data.file_url) return data;
+  const urlFolderPath = data.file_url.split('/').slice(0, -1).join('/') || ''; // File location
+  const fileName = data.file_url.split('/').pop(); // filename + ext
+  const originName = fileName.substring(0, fileName.lastIndexOf('.'));
+  const extFile = fileName.substring(fileName.lastIndexOf('.') + 1, fileName.length).toLowerCase();
+  const isExcelFile = AppConstants.FILE_TYPE_DOC_EXCEL.includes(extFile);
+  // Create actual url path for pdf, excel files
+  if (isExcelFile && urlFolderPath && fileName && originName && extFile) {
+    data.file_url = `${urlFolderPath}/${originName}.${AppConstants.DOC_FILE_TYPE.PDF}`;
+    data.xls_url = `${urlFolderPath}/${originName}.${AppConstants.DOC_FILE_TYPE.EXCEL_XLS}`;
+    data.xlsx_url = `${urlFolderPath}/${originName}.${AppConstants.DOC_FILE_TYPE.EXCEL_XLSX}`;
+  }
+  return data;
+}
