@@ -4,7 +4,7 @@ import fs from 'fs';
 import AppConstants from '../utils/constants';
 import { SERVICE_ACCOUNT } from '../env';
 import logger from '~/shared/logger';
-import { saveFileProcGGDrive, saveFileExcelProc } from '~/utils/commonFuncs';
+import { saveFileProcGGDrive, saveFileExcelProc, loggerUploadMethods, secureFilename } from '~/utils/commonFuncs';
 import DocDataServices from '../docData/DocDataServices';
 import { saveImgAsPdfGGDrive } from '../document/uploadDocMethod';
 
@@ -35,6 +35,7 @@ async function getDriveService() {
       auth: oauth2Client,
     });
   } catch (error) {
+    loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.DRIVE, ` Error from Google Drive service authentication ${error}`);
     logger.error(error);
   }
 }
@@ -55,6 +56,7 @@ async function getDriveClient(keyFilePath) {
       auth: oAuthClient,
     });
   } else {
+    loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.DRIVE, ` Error when validate client credentials file ${error}`);
     console.log('client credentials: ', error);
   }
 }
@@ -83,6 +85,7 @@ export async function listFiles(folderId, credentials_filepath) {
       console.log('files: ', files);
       return files;
     } catch (error) {
+      loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.DRIVE, ` Error while getting folder info ${error}`);
       throw error;
     }
   } else {
@@ -116,9 +119,34 @@ export async function getFolderInfo(folderId, credentials_filepath) {
       return folder;
     }
   } catch (error) {
-    logger.error('The API returned an error:');
-    logger.error(error);
+    loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.DRIVE, ` Error while getting files from folder ${error}`);
     throw error;
+  }
+}
+
+// This function is for adding the missing extension for the file
+/**
+ * 
+ * @param {original name of the file} originalFileName 
+ * @param {fileType defined by googleDrive} mimeType 
+ * @returns 
+ *  + originalFileName if file already has extension
+ *  + file name + extension if file not yet has extension
+ */
+const addExtensionForFile = (originalFileName, mimeType) => {
+  const fileExt = originalFileName.split('.').pop();
+  const fileName = originalFileName.replace(`.${fileExt}`, '');
+  try {
+    // Check if the file already has extension
+    const listExts = Object.keys(AppConstants.INCLUDE_TYPE_MIMETYPE_MAPPING);
+    if (!listExts.includes(`.${fileExt.toLowerCase()}`) && mimeType) {
+      const missingKey = listExts.find(key => AppConstants.INCLUDE_TYPE_MIMETYPE_MAPPING[key] === mimeType);
+      return `${fileName}${missingKey}`;
+    }
+    return `${fileName}.${fileExt.toLowerCase()}`;
+  } catch (err) {
+    loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.DRIVE, ` Error when add extension for the file`);
+    return `${fileName}.${fileExt.toLowerCase()}`;
   }
 }
 
@@ -135,11 +163,11 @@ export function downloadFile(file, folderLocation, credentials_filepath) {
     // Check if file's already on server. Add number after file name
     // e.g. file_name(1).pdf
     let duplFileNum = 0;
-    let newFile = name;
+    let newFile = secureFilename(addExtensionForFile(name, mimeType));
     const fileExt = `${newFile}`.split('.').pop();
     const fileName = newFile.replace(`.${fileExt}`, '');
     // Check file types for uploading
-    if (AppConstants.INCLUDE_FILE_TYPES.includes(`.${fileExt}`.toLowerCase())) {
+    if (Object.keys(AppConstants.INCLUDE_TYPE_MIMETYPE_MAPPING).includes(`.${fileExt}`.toLowerCase())) {
       // Loop rename newFile
       while (fs.existsSync(`${fullPath}/${newFile}`)) {
         duplFileNum += 1;
@@ -147,6 +175,7 @@ export function downloadFile(file, folderLocation, credentials_filepath) {
 
       }
       // Write file to FILE FOLDER
+      const downloadFileStartTime = Date.now();
       if (fs.existsSync(fullPath) && !AppConstants.EXCLUDE_MIMETYPE.includes(mimeType)) { // here
         const dest = fs.createWriteStream(`${fullPath}/${newFile}`); // here
         getDriveAPI(credentials_filepath).then(drive => {
@@ -165,8 +194,7 @@ export function downloadFile(file, folderLocation, credentials_filepath) {
                 }
                 )
                 .on('error', err => {
-                  logger.error('Error during download');
-                  logger.error(err);
+                  loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.DRIVE, ` Error during download file into server ${error}`);
                   throw err;
                 })
                 .pipe(dest);                
@@ -174,6 +202,7 @@ export function downloadFile(file, folderLocation, credentials_filepath) {
           );
         });
       }
+      loggerUploadMethods('info', AppConstants.UPLOAD_METHOD_TYPES.DRIVE, ` Download File: ${fileName}`, downloadFileStartTime);
     }
 
   });
@@ -192,17 +221,16 @@ export const uploadGGDrive = async (docData, originalFileName) => {
     const fileName = splitFileName.slice(0, -1).join('.');
     const nextDocId = latestDoc.doc_id ? (Number(latestDoc.doc_id) + 1).toString() : 0;
     let nextDocNm = `${nextDocId}_${originalFileName}`;
-    const oldFilePath = `${AppConstants.LOCATION_DOC_FILE}/${docData.urlFolder}/${DOWNLOAD_FOLDER_NAME_GGDRIVE}/${originalFileName}`
-    const newFilePath = `${process.env.REACT_APP_DOC_LOC}/${docData.urlFolder}/${nextDocId}_${fileName}`;
-    const newFolderPath = `${AppConstants.LOCATION_DOC_FILE}/${docData.urlFolder}/Output`;
+    const oldFilePath = `${AppConstants.LOCATION_DOC_FILE}/${docData.urlFolder.replace('Output', DOWNLOAD_FOLDER_NAME_GGDRIVE)}/${originalFileName}`
+    const newFolderPath = `${AppConstants.LOCATION_DOC_FILE}/${docData.urlFolder}`;
     if (AppConstants.FILE_TYPE_DOC_IMG.includes(fileExtension)) {
       nextDocNm = `${nextDocId}_${fileName}.pdf`;
       await saveImgAsPdfGGDrive(docData.urlFolder, originalFileName, nextDocNm, fileExtension);
     } else if (AppConstants.FILE_TYPE_DOC_EXCEL.includes(fileExtension)) {
       await saveFileExcelProc(AppConstants.LOCATION_DOC_FILE, docData.urlFolder, originalFileName, `${nextDocId}_${fileName}`, nextDocId);
-      servPath = `${newFilePath}.pdf`;
-      xlsPath = `${newFilePath}.xls`;
-      xlsxPath = `${newFilePath}.xlsx`;
+      servPath = `${process.env.REACT_APP_DOC_LOC}/${docData.urlFolder}/${nextDocId}_${fileName}.pdf`;
+      xlsPath = `${process.env.REACT_APP_DOC_LOC}/${docData.urlFolder}/${nextDocId}_${fileName}.xls`;
+      xlsxPath = `${process.env.REACT_APP_DOC_LOC}/${docData.urlFolder}/${nextDocId}_${fileName}.xlsx`;
     } else {
       await saveFileProcGGDrive(oldFilePath,newFolderPath,nextDocNm);
     }
@@ -212,7 +240,7 @@ export const uploadGGDrive = async (docData, originalFileName) => {
       doc_nm: nextDocNm,
     };
     if (!servPath) {
-      servPath =  `${process.env.REACT_APP_DOC_LOC}/${addDocData.urlFolder}/Output/${nextDocNm}`;
+      servPath =  `${process.env.REACT_APP_DOC_LOC}/${addDocData.urlFolder}/${nextDocNm}`;
     }
     await DocDataServices.addDexdoc(addDocData);
     return {

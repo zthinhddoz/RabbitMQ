@@ -7,6 +7,7 @@ import { Base64Decode } from 'base64-stream';
 import Imap from 'imap';
 import AppConstants from '../utils/constants';
 import logger from '../shared/logger';
+import { loggerUploadMethods, secureFilename } from '../utils/commonFuncs';
 
 export default async function getEmailAttachment(data) {
   const fileFolder = 'file';
@@ -52,13 +53,15 @@ export default async function getEmailAttachment(data) {
       const prefix = `#${seqno}`;
       console.log('ON ATTACHMENT');
       msgAttachment.on('body', (stream, info) => {
+        const downloadFileStartTime = Date.now();
         console.log(`${prefix} Streaming this attachment to file`, fileName, info);
         // Create a write stream so that we can stream the attachment to file;
         const folderPath = `${fileFolder}/${urlFolder}/Input`;
         if (!fs.existsSync(folderPath)){
           fs.mkdirSync(folderPath, {recursive: true});
         }
-        const filePath = `${folderPath}/${fileName}`
+        
+        const filePath = `${folderPath}/${fileName}`;
         const writeStream = fs.createWriteStream(filePath);
         writeStream.on('finish', () => {
           console.log(`${prefix} Done writing to file %s`, fileName);
@@ -68,8 +71,10 @@ export default async function getEmailAttachment(data) {
         } else {
           stream.pipe(writeStream);
         }
+        loggerUploadMethods('info', AppConstants.UPLOAD_METHOD_TYPES.GMAIL, ` Download File: ${fileName}`, downloadFileStartTime);
       });
       msgAttachment.once('error', error => {
+        loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.GMAIL, ` Download file error: ${fileName}`);
         console.log('error message', error);
         isHavingError = true;
         imap.end();
@@ -146,7 +151,8 @@ export default async function getEmailAttachment(data) {
                           .replace(/\=/g, '%')
                         : attachment.params.name,
                   );
-                  if (AppConstants.INCLUDE_FILE_TYPES.includes(`.${(fileName.split('.').pop()).toLowerCase()}`)) {
+                  fileName = secureFilename(fileName);
+                  if (Object.keys(AppConstants.INCLUDE_TYPE_MIMETYPE_MAPPING).includes(`.${(fileName.split('.').pop()).toLowerCase()}`)) {
                     const fetchAttachment = imap.fetch(attrs.uid, {
                       bodies: [attachment.partID],
                       struct: true,
@@ -167,6 +173,7 @@ export default async function getEmailAttachment(data) {
               console.log(`${prefix} Finished email !!!`);
             });
             msg.once('error', (error) => {
+              loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.GMAIL, ` Error when fetching attachments ${error}`);
               console.log('error message', error);
               isHavingError = true;
               imap.end();
@@ -174,6 +181,7 @@ export default async function getEmailAttachment(data) {
             });
           });
           fetcher.once('error', (error) => {
+            loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.GMAIL, `Fetch error: ${error}`);
             console.log(`Fetch error: ${error}`);
             isHavingError = true;
             imap.end();

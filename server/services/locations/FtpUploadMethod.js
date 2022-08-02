@@ -4,6 +4,7 @@ import { BadRequestError } from '../utils/errors';
 import AppConstants from '~/utils/constants';
 import ExtractionServices from '../extraction/ExtractionServices';
 import logger from '../shared/logger';
+import { loggerUploadMethods, secureFilename } from '../utils/commonFuncs';
 const ftp = require('basic-ftp');
 
 export default class FtpUploadMethod {
@@ -14,7 +15,7 @@ export default class FtpUploadMethod {
   static async downloadFileSftpServer(dataAllMethod, data) {
     try {
       const client = new SFTPClient();
-      const attachments = [];
+      const downStartTime = Date.now();
       const config = {
         host: dataAllMethod[0] ? dataAllMethod[0].host_ip : null,
         username: dataAllMethod[0] ? dataAllMethod[0].usr_id : null,
@@ -27,18 +28,39 @@ export default class FtpUploadMethod {
         fs.mkdirSync(saveDestination, { recursive: true });
       }
       const sourceFile = dataAllMethod[0] ? dataAllMethod[0].dir_path : null;
-      await client.connect(config);
-      client.on('download', info => {
-        attachments.push(info.source.replace(/^.*[\\\/]/, ''));
+      const downloadedFiles = [];
+      await client.connect(config).then(() => {
+       return client.list(`/${sourceFile}`);
+      }).then(async data => {
+        loggerUploadMethods('info', AppConstants.UPLOAD_METHOD_TYPES.SFTP, `fetching files: ${data}`);
+        for (let i = 0; i < data.length; i++) {
+          const newFilename = secureFilename(data[i].name);
+          const writeStreamFile = fs.createWriteStream(`${saveDestination}/${newFilename}`);
+          const remoteFilePath = `/${sourceFile}/${data[i].name}`;
+          if (client.exists(remoteFilePath)) {
+            await client.get(remoteFilePath, writeStreamFile);
+            downloadedFiles.push(newFilename);
+          }
+          writeStreamFile.close(); 
+        }
+        loggerUploadMethods('info', AppConstants.UPLOAD_METHOD_TYPES.SFTP, 'Total Download Time', downStartTime)
+      }).catch(error => {
+        loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.SFTP, ` Error while processing upload and extraction ${error}`);
       });
-      const rslt = await client.downloadDir(sourceFile, saveDestination);
-      await this.uploadAndRunFullFlow(attachments, saveDestination, data);
-      // remove folder files input
-      fs.rmdirSync(saveDestination, { recursive: true });
-      return { message: 'Download file from SFTP server successfully', file: attachments };
+      client.end();
+
+      // Logging execution time for Upload and Extraction Flow 
+      const extractTimeStart = Date.now();
+      await this.uploadAndRunFullFlow(downloadedFiles, saveDestination, data);
+      loggerUploadMethods('info', AppConstants.UPLOAD_METHOD_TYPES.SFTP, 'Total Extract Time', extractTimeStart);
+      return { message: 'Download file from SFTP server successfully', file: downloadedFiles };
     } catch (error) {
-      console.log(error);
-      throw new BadRequestError({ errorCode: 313 });
+      loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.SFTP, ` Error while processing upload and extraction ${error}`);
+      if (error?.code === 2) {
+        throw new BadRequestError({ errorCode: 316 });
+      } else {
+        throw new BadRequestError({ errorCode: 313 });
+      }
     }
   }
 
@@ -51,25 +73,43 @@ export default class FtpUploadMethod {
       if (!fs.existsSync(saveDestination)) {
         fs.mkdirSync(saveDestination, { recursive: true });
       }
-      const sourceFile = dataAllMethod[0] ? dataAllMethod[0].dir_path : null;
+      const sourceFile = dataAllMethod[0] ? dataAllMethod[0].dir_path : null; 
+      const downStartTime = Date.now();
       await client.access({
         host: dataAllMethod[0] ? dataAllMethod[0].host_ip : null,
         user: dataAllMethod[0] ? dataAllMethod[0].usr_id : null,
         password: dataAllMethod[0] ? dataAllMethod[0].usr_pwd : null,
       });
-      await client.downloadToDir(saveDestination, sourceFile);
+      const attachments = await client.list(sourceFile);
+      const downloadedFiles = [];
+      if (attachments && attachments.length > 0) {
+        // console.log('list files in dir: ', await client.list(sourceFile));
+        for (let i = 0; i < attachments.length; i++) {
+          const newFilename = secureFilename(attachments[i].name);
+          const writeStreamFile = fs.createWriteStream(`${saveDestination}/${newFilename}`);
+          const remoteFilePath = `${sourceFile}/${attachments[i].name}`;
+          await client.downloadTo(writeStreamFile, remoteFilePath);
+          downloadedFiles.push(newFilename);
+          writeStreamFile.close(); 
+        }
+      } else {
+        throw new BadRequestError({ errorCode: 316 });
+      }
       client.close();
-      const attachments = [];
-      fs.readdirSync(saveDestination).forEach(file => {
-        attachments.push(file);
-      });
-      logger.info(`Fetching attachment %s ${attachments}`);
-      await this.uploadAndRunFullFlow(attachments, saveDestination, data);
-      // remove folder files input
-      fs.rmdirSync(saveDestination, { recursive: true });
-      return { message: 'Download file from FTP server successfully', file: attachments };
+      loggerUploadMethods('info', AppConstants.UPLOAD_METHOD_TYPES.FTP, `Fetching attachment ${downloadedFiles}`);
+      loggerUploadMethods('info', AppConstants.UPLOAD_METHOD_TYPES.FTP, 'Total Download Time', downStartTime);
+      // Logging execution time for Upload and Extraction Flow 
+      const extractTimeStart = Date.now();
+      await this.uploadAndRunFullFlow(downloadedFiles, saveDestination, data);
+      loggerUploadMethods('info', AppConstants.UPLOAD_METHOD_TYPES.FTP, 'Total Extract Time', extractTimeStart);
+      return { message: 'Download file from FTP server successfully', file: downloadedFiles };
     } catch (error) {
-      throw new BadRequestError({ errorCode: 314 });
+      loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES.FTP, ` Error while processing upload and extraction ${error}`);
+      if (error?.code === 550) {
+        throw new BadRequestError({ errorCode: 316 });
+      } else {
+        throw new BadRequestError({ errorCode: 314 });
+      }
     }
   }
 
@@ -79,8 +119,11 @@ export default class FtpUploadMethod {
         const fileName = attachments[i];
         const filePath = `${saveDestination}/${fileName}`;
         const fileSize = (fs.statSync(filePath).size / 1024).toFixed(1);
+        const fileExtractTimeStart = Date.now();
         await ExtractionServices.saveExtractDocument({ ...data, root_nm: fileName, file_sz: fileSize }, fileName);
+        loggerUploadMethods('info', [AppConstants.UPLOAD_METHOD_TYPES.FTP, AppConstants.UPLOAD_METHOD_TYPES.SFTP].join(' '), ` Extracting file: ${fileName}`, fileExtractTimeStart);
       } catch (err) {
+        loggerUploadMethods('error', AppConstants.UPLOAD_METHOD_TYPES, ` Error when Upload and Run Extraction Flow ${err}`);
         throw new BadRequestError({ errorCode: 313 });
       }
     }

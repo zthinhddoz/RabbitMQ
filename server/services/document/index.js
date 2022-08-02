@@ -4,7 +4,7 @@ import genareteNewId from "../utils/generateNewId";
 import AdmDocServices from './AdmDocServices';
 import ExtractionServices from '../extraction/ExtractionServices';
 import { saveExtractDoc, uploadDocMethod } from './uploadDocMethod';
-import { moveFileDownloadFromMiddleWareToInput } from '~/utils/commonFuncs';
+import { moveFileDownloadFromMiddleWareToInput, secureFilename } from '~/utils/commonFuncs';
 import logger from '~/shared/logger';
 import keycloak from '../shared/middleWare/checkSSO';
 const uploadDoc = require('../shared/middleWare/uploadDoc');
@@ -12,6 +12,7 @@ import ExtractionRuleServices from '../extractionRule/ExtractionRuleServices';
 import generateNewId from '~/utils/generateNewId';
 import { PREFIX_ID_LOC, getLatestId } from '~/locations/index';
 import { createBulkData } from '../utils/commonFuncs';
+let Producer = require('../AMPQCore/producer');
 
 import { formatAttr } from '../utils/commonFuncs';
 const { Op } = require("sequelize");
@@ -527,8 +528,13 @@ router.post('/upload-file', keycloak.protect(), uploadDoc, async (req, res) => {
   try {
     const docInfo = req.body;
     const originalFileName = req.file.originalname;
-    await moveFileDownloadFromMiddleWareToInput(originalFileName, docInfo.urlFolder.replace('Output', 'Input'));
-    const resObj = await uploadDocMethod(docInfo, originalFileName);
+    const cleanFilename = secureFilename(originalFileName);
+    await moveFileDownloadFromMiddleWareToInput(
+      originalFileName,
+      docInfo.urlFolder.replace('Output', 'Input'),
+      cleanFilename,
+    );
+    const resObj = await uploadDocMethod(docInfo, cleanFilename);
 
     // For Label upload result
     if (resObj.child_form_info) {
@@ -599,6 +605,27 @@ router.get('/:docTpId/doc', keycloak.protect(), async (req, res) => {
   const result = await AdmDocServices.getAdmDocs(includeClause, whereClause);
   if (result) res.status(200).json({ result, message: 'Find documents fields suceesfully' });
   return res.status(500).json({ errorCode: 100 });
+});
+
+router.post('/upload-file-multi-pages', uploadDoc, async (req, res) => {
+  try {
+    const docInfo = req.body;
+    const originalFileName = req.file.originalname;
+    const cleanFilename = secureFilename(originalFileName);
+    await moveFileDownloadFromMiddleWareToInput(
+      originalFileName,
+      docInfo.urlFolder.replace('Output', 'Input'),
+      cleanFilename,
+    );
+    const resObj = await uploadDocMethod(docInfo, cleanFilename, true);
+    logger.info('sending message into queue');
+    const docExtractData = await ExtractionServices.makeExtractDocData(resObj, resObj.usr_id, false);
+    Producer.sendMessageProc(docExtractData);
+    return res.status(200).json(resObj);
+  } catch (err) {
+    logger.error(err);
+    return res.status(500).json({ errorCode: 108 });
+  }
 });
 
 export default router;

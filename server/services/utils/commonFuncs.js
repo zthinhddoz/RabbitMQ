@@ -33,16 +33,18 @@ export const checkAddFolderGGDrive = (folderLoc) => {
 };
 
 // This function move file downloads by middleware to input folder with more details.
-export const moveFileDownloadFromMiddleWareToInput = async (fileName, urlFolder) => {
+export const moveFileDownloadFromMiddleWareToInput = async (fileName, urlFolder, newFileName = '') => {
   checkAddFolderDoc(`${urlFolder}`);
   const oldPath = `${AppConstants.LOCATION_DOC_FILE}/${fileName}`;
-  const newPath = `${AppConstants.LOCATION_DOC_FILE}/${urlFolder}/${fileName}`;
+  const newPath = newFileName
+    ? `${AppConstants.LOCATION_DOC_FILE}/${urlFolder}/${newFileName}`
+    : `${AppConstants.LOCATION_DOC_FILE}/${urlFolder}/${fileName}`;
   fs.copyFileSync(oldPath, newPath, err => {
     if (err) console.log('Err', err);
   });
   // Remove added file
   fs.unlinkSync(oldPath);
-}
+};
 
 export const moveFileFileFromMiddlewareToOther = async (fileName, prefixFileName, urlFolder) => {
   checkAddFolderDoc(`${urlFolder}`);
@@ -87,6 +89,8 @@ export const saveFileProc = (originFolder, targetForder, originalFileName, newDo
  */
 export const saveFileExcelProc = async (originFolder, targetForder, originalFileName, newDocName, nextDocId) => {
   try {
+    const splitFileName = originalFileName.split('.');
+    const fileExtension = splitFileName[splitFileName.length - 1]?.toLowerCase() || '';
     checkAddFolderDoc(targetForder);
     // Copy file into doc location
     const oldPath = `${originFolder}/${targetForder.replace("Output", "Input")}/${originalFileName}`;
@@ -98,13 +102,21 @@ export const saveFileExcelProc = async (originFolder, targetForder, originalFile
     const convertExcelRes = await axios
       .create({
         headers: formDataConvertExcel.getHeaders(),
-        responseType: 'stream'
+        responseType: 'stream',
       })
       .post(process.env.EXCEL_CONV, formDataConvertExcel);
 
     if (convertExcelRes && convertExcelRes.status === 200) {
-      let filename = `${newDocName}.${convertExcelRes.headers["x-filename"].split('.').pop().toLowerCase()}`;
-      let newPathExcel = `${originFolder}/${targetForder}/${filename}`;
+      const filename = `${nextDocId}_${convertExcelRes.headers['x-filename']}`;
+      const newFileExt = filename
+        .split('.')
+        .pop()
+        .toLowerCase();
+      const originFilename = originalFileName
+        .split('.')
+        .slice(0, -1)
+        .join('.');
+      const newPathExcel = `${originFolder}/${targetForder}/${nextDocId}_${originFilename}.${newFileExt}`;
       convertExcelRes.data.pipe(fs.createWriteStream(newPathExcel));
     } else {
       throw new Error();
@@ -123,22 +135,24 @@ export const saveFileExcelProc = async (originFolder, targetForder, originalFile
           })
           .get(convertPdfRes.data.data.path)
         if (fileRes && fileRes.status === 200) {
-          fileRes.data.pipe(fs.createWriteStream(`${originFolder}/${targetForder}/${newDocName}.pdf`));
+          const pdfFile = `${originFolder}/${targetForder}/${newDocName}.pdf`;
+          fileRes.data.pipe(fs.createWriteStream(pdfFile));
         } else throw new Error();
       } else throw new Error();
     } else throw new Error();
 
-    fs.copyFileSync(oldPath, `${originFolder}/${targetForder}/${newDocName}.${originalFileName.split('.').pop()}`, err => {
-      if (err) console.log('Err', err);
-    });
+    fs.copyFileSync(oldPath, `${originFolder}/${targetForder}/${newDocName}.${fileExtension}`, err => {
+        if (err) console.log('Err', err);
+      },
+    );
     // Remove added file
     fs.unlinkSync(`${oldPath}`);
   } catch (error) {
     logger.error(error);
     throw new Error('Save file Error');
   }
-
 };
+
 
 
 export const saveFileProcGGDrive = (oldFilePath,newFolderPath,nextDocNm) => {
@@ -246,4 +260,51 @@ export const getFullPathForAllFileTypes = async data => {
     data.xlsx_url = `${urlFolderPath}/${originName}.${AppConstants.DOC_FILE_TYPE.EXCEL_XLSX}`;
   }
   return data;
+}
+
+// Convert time (ms) to format: 00 min - 000 sec
+const convertTime = (time) => {
+    const minute = (time / 1000) / 60;
+    const second = (time / 1000) % 60;
+    return `${minute.toString().split('.')[0]} min - ${second.toFixed(3)} sec`;
+}
+
+/**
+ * 
+ * @param {type of logging: info, error} type 
+ * @param {GMAIL || FTP/SFTP || DRIVE Method upload} method 
+ * @param {Log message (option)} message 
+ * @param {Start time for executed time log} start 
+ */
+export const loggerUploadMethods = (type, method, message='', start=null) => {
+  const end = Date.now();
+  if (type === 'info') {
+    if (start) logger.info([method, message, `${convertTime(end - start)}`].join(' '));
+    else logger.info([method, message].join(' '));
+  } else if (type === 'error') {
+    logger.error([method, message].join(' '));
+  }
+};
+
+/**
+ *
+ * @param {original filename from input file} originFilename 
+ */
+export const secureFilename = originFilename => {
+  if (originFilename) {
+    const fileExtension = originFilename
+      .split('.')
+      .pop()
+      .toLowerCase();
+    if (
+      AppConstants.FILE_TYPE_DOC_EXCEL.includes(fileExtension) ||
+      AppConstants.FILE_TYPE_DOC_IMG.includes(fileExtension) ||
+      AppConstants.FILE_TYPE_DOC_UPLOAD.includes(`.${fileExtension}`)
+    ) {
+      const fileName = originFilename.replace(`.${fileExtension}`, '');
+      const cleanFn = fileName.replace(/[^a-z0-9]/gi, '_').toUpperCase();
+      return `${cleanFn}.${fileExtension}`;
+    } return originFilename;
+  }
+  return originFilename;
 }

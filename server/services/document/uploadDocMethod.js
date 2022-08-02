@@ -140,7 +140,7 @@ const saveImgAsPdf = async (urlFolder, originalFileName, newDocName, fileExtensi
  * This func also add to dex doc data
  */
 
-export const uploadDocMethod = async (docData, originalFileName) => {
+export const uploadDocMethod = async (docData, originalFileName, isMultiPg=false) => {
   try {
     const orcResultParse = docData?.ocr_result?.length ? JSON.parse(docData.ocr_result) : [];
     const latestDoc = await DocDataServices.getLatestDexDoc();
@@ -224,8 +224,8 @@ export const uploadDocMethod = async (docData, originalFileName) => {
         await saveFileProc(AppConstants.LOCATION_DOC_FILE, docData.urlFolder, originalFileName, nextDocNm);
         servPath = `${process.env.REACT_APP_DOC_LOC}/${addDocData.urlFolder}/${nextDocNm}`;
       }
-      addDocData.doc_nm = nextDocNm,
-
+      addDocData.doc_nm = nextDocNm;
+      addDocData.sts_cd = 'P';
       await DocDataServices.addDexdoc(addDocData);
       return {
         sts_cd: 200,

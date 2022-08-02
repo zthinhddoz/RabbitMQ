@@ -28,16 +28,6 @@ export default class BPServices {
       const coreSysName = await this.getCoreSystemName(docTypeId);
       const baseCoreUrl = getBaseCoreUrl(coreSysName);
       coreDataReq = modifyCoreReqData(coreSysName, coreDataReq);
-      const fileUrl = coreDataReq.file_url || coreDataReq.root_url;
-      const fileExtension = fileUrl
-        .split('.')
-        .pop()
-        .toLowerCase();
-      const isExcelFile = AppConstants.FILE_TYPE_DOC_EXCEL.includes(fileExtension);
-      if (isExcelFile) {
-        coreDataReq.xlsx_url = fileUrl.replace(`.${fileExtension}`, `.XLSX`)
-        coreDataReq.xls_url = fileUrl.replace(`.${fileExtension}`, `.XLS`)
-      }
       logger.info(`Req matching from core ${baseCoreUrl}`);
       logger.info(JSON.stringify(coreDataReq));
       const matchingRes = await axios

@@ -7,6 +7,7 @@ import { uploadDocMethod } from '../document/uploadDocMethod';
 import { processRunExtrRuleByDoc } from '../extractionRule/index.js';
 import CoreAdapterServices from '../coreAdapter/CoreAdapter';
 import ManageApiServices from '../manageApi/manageApiServices.js';
+import { getFullPathForAllFileTypes } from '../utils/commonFuncs';
 import { getCodeFromClient, getCodeFromClientWithAuthen, callReturnCodeProc } from '../manageApi/manageApiFunctions';
 import logger from '~/shared/logger';
 import { isArray } from 'lodash';
@@ -73,13 +74,15 @@ export default class ExtractionServices {
    * @param {*} fileData
    * @returns
    */
-   static async extractDocument(fileData, reExtract = false, updateTmplt = false) {
-    const { doc_id } = fileData;
+   static async extractDocument(docData, reExtract = false, updateTmplt = false) {
+    const { doc_id } = docData;
+    let fileData = { ...docData };
     if (!fileData && !doc_id) throw new Error('Extract File Info wrong!!!');
     let tmpType = '';
     let tmpId = '';
-    let status = AppConstants.DOC_STATUS.NEED_MATCHING;
-    const fileUrl = fileData.file_url ? fileData.file_url : `${process.env.REACT_APP_DOC_LOC}${fileData.fileLoc}`;
+    let status = AppConstants.DOC_STATUS.IN_PROCESSING;
+    fileData = await getFullPathForAllFileTypes(fileData);
+    let fileUrl = fileData.file_url ? fileData.file_url : `${process.env.REACT_APP_DOC_LOC}${fileData.fileLoc}`;
     let coreErrMsg = '';
     let extractJson = null;
     const usrId = fileData.usr_id || 'no-user';
@@ -271,6 +274,12 @@ export default class ExtractionServices {
     } catch (error) {
       logger.error(error);
     }
+    
+    if (status === AppConstants.DOC_STATUS.IN_PROCESSING) {
+      status = AppConstants.DOC_STATUS.NEED_MATCHING;
+      await this.updateDocData(reExtract, doc_id, tmpId, status, usrId);
+    }
+
     const annotateUrl = tmpId ? `${process.env.CLIENT_URL + AppConstants.CLIENT_URL.ANNOTATE}/${tmpType}/${tmpId}` : '';
     const viewExtUrl = process.env.CLIENT_URL + AppConstants.CLIENT_URL.VIEW_EXT;
     this.dataRes = {

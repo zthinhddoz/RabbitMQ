@@ -7,7 +7,7 @@ import { Op } from 'sequelize';
 import multer from 'multer';
 import fs from 'fs';
 import generateNewId from '~/utils/generateNewId';
-import { customRes, createBulkData } from '~/utils/commonFuncs';
+import { customRes, createBulkData, convertTime } from '~/utils/commonFuncs';
 import model from '~/shared/models';
 import logger from '~/shared/logger';
 import LocationServices from './LocationServices';
@@ -19,6 +19,7 @@ import AppConstants from '~/utils/constants';
 import getEmailAttachment from './EmailUploadMethod';
 import ExtractionServices from '../extraction/ExtractionServices';
 import { BadRequestError } from '../utils/errors';
+import { loggerUploadMethods } from '../utils/commonFuncs';
 
 const router = Router();
 export const PREFIX_ID_LOC = 'LOC';
@@ -647,14 +648,17 @@ router.get('/upload-from-drive', keycloak.protect(), async (req, res, next) => {
               // Update current time when download is done
               if (hasUpload) {
                   // Extract file
+                  let fileStartProcessTime = null;
+                  let fileEndProcessTime = null;
                   for (let i = 0; i < docDataUpLoads.length; i++) {
                     try{
+                      fileStartProcessTime = Date.now();
                       const uploadGG = await uploadGGDrive(docDataUpLoads[i],docDataUpLoads[i].root_nm)
                       const docExtractData = await ExtractionServices.makeExtractDocData(uploadGG,docDataUpLoads[i].cre_usr_id, true);
-                      await ExtractionServices.extractDocument(docExtractData, false, true)
-                      throw new Error("Error extract file: ");
-                    }catch (e) {
-                      console.error(e.message + docDataUpLoads[i].root_nm);
+                      await ExtractionServices.extractDocument(docExtractData, false, true);
+                      loggerUploadMethods('info', AppConstants.UPLOAD_METHOD_TYPES.DRIVE, ` File Extract Time ${docDataUpLoads[i].root_nm}`, fileStartProcessTime);
+                    } catch (e) {
+                      logger.error(e.message + docDataUpLoads[i].root_nm);
                     };
                   }
                 await model.DexUpldMzd.update(
@@ -668,9 +672,9 @@ router.get('/upload-from-drive', keycloak.protect(), async (req, res, next) => {
                   },
                 ).then(rowUpdate => {
                         if (rowUpdate == null) 
-                          res.status(500).json({ errorCode: 306 });
+                          return res.status(500).json({ error: 306 });
                         else 
-                          res.status(200).json({
+                          return res.status(200).json({
                             message: 'Location upload method updated',
                           });
                       })
@@ -681,9 +685,10 @@ router.get('/upload-from-drive', keycloak.protect(), async (req, res, next) => {
               }else 
               return customRes(req, res, next, { message: 'Upload file completed' });
             } else
-            return res.status(500).json({ errorCode: 306 });
-          } else
-          return res.status(500).json({ errorCode: 312 });
+            return res.status(500).json({ error: 306 });
+          } else {
+            return res.status(500).json({ error: 312 });
+          }
         }
       })
       .catch(error => {
@@ -692,7 +697,7 @@ router.get('/upload-from-drive', keycloak.protect(), async (req, res, next) => {
       });
   } catch (error) {
     logger.error(error);
-    return res.status(500).json({ errorCode: 306 });
+    return res.status(500).json({ error: 306 });
   }
 });
 
@@ -707,39 +712,46 @@ router.post('/upload-from-email', async (req, res) => {
       dataAllMethod,
     });
     let logs = [];
-    for (let i = 0, len = attachments.length; i < len; i++) {
+    for (let i = 0; i < attachments.length; i++) {
       try {
         const fileName = attachments[i];
         const filePath = `${AppConstants.LOCATION_DOC_FILE}/${docInfo.urlFolder.replace('Output', 'Input')}/${fileName}`;
-        const fileSize = (fs.statSync(filePath).size / 1024).toFixed(1);
-        const dataRes = await ExtractionServices.saveExtractDocument(
-          { ...docInfo, root_nm: fileName, file_sz: fileSize },
-          fileName,
-        );
-        if (dataRes.status === 'N' && dataRes.extractJson == null) {
-          logs.push({ dataRes: dataRes, message: 'Matching FAILED' });
+        if (fs.existsSync(filePath)) {
+          const fileSize = (fs.statSync(filePath).size / 1024).toFixed(1);
+          const dataRes = await ExtractionServices.saveExtractDocument(
+            { ...docInfo, root_nm: fileName, file_sz: fileSize },
+            fileName,
+          );
+          if (dataRes.status === 'N' && dataRes.extractJson == null) {
+            logs.push({ dataRes: dataRes, message: 'Matching FAILED' });
+          }
         }
       } catch (err) {
+        logger.error(err);
         next(err);
         continue;
       }
     }
-    res.status(200).json({
+    return res.status(200).json({
       message: 'Location upload method updated',
       logs: logs,
     });
   } catch (error) {
-    res.status(500).json({ errorCode: 310 });
+    return res.status(500).json({ error: 310 });
   }
 });
 router.post('/upload-from-ftp-sftp-server', async (req, res, next) => {
   const data = req.body;
   const dataAllMethod = await LocationServices.getUploadData(['locationId'], { loc_id: data.loc_id });
   let dataRes = null;
-  if (data.isUseSFTP) {
-    dataRes = await FtpUploadMethod.downloadFileSftpServer(dataAllMethod, data).catch(err => next(err));
-  } else if (data.isUseFTP) {
-    dataRes = await FtpUploadMethod.downloadFileFtpServer(dataAllMethod, data).catch(err => next(err));
+  if (dataAllMethod.length > 0) {
+    if (data.isUseSFTP) {
+      dataRes = await FtpUploadMethod.downloadFileSftpServer(dataAllMethod, data).catch(err => next(err));
+    } else if (data.isUseFTP) {
+      dataRes = await FtpUploadMethod.downloadFileFtpServer(dataAllMethod, data).catch(err => next(err));
+    }
+  } else {
+    return res.status(400).json({ error: 315});
   }
   customRes(req, res, next, dataRes);
 });

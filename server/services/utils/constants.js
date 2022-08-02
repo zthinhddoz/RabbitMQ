@@ -69,6 +69,7 @@ const AppConstants = {
     FAILED: 'F',
     NEED_MATCHING: 'N',
     VERIFY: 'V',
+    IN_PROCESSING: 'P',
   },
   DOC_ISSUES_CODE: {
     PE: 'PE',
@@ -148,6 +149,13 @@ const AppConstants = {
   },
   DIFF_LIMIT_PERCENT: 70,
   VESSEL_PROFILE: 'Vessel Profile',
+  // For logging
+  UPLOAD_METHOD_TYPES: {
+    GMAIL: '[GMAIL METHOD]',
+    FTP: '[FTP METHOD]',
+    SFTP: '[SFTP METHOD]',
+    DRIVE: '[GOOGLE DRIVE METHOD]'
+  }
 };
 
 export default AppConstants;
