@@ -1,20 +1,21 @@
 version: '3'
 
 services:
-  redis:
-    image: redis
-    container_name: DoEx-redis-${NODE_ENV}
-    restart: always
-    volumes:
-      - ../database/redis:/data:rw
-    env_file:
-      - .env
-    ports:
-      - ${REDIS_PORT}:6379
+  # redis:
+  #   image: redis
+  #   container_name: DoEx-redis-${NODE_ENV}
+  #   restart: always
+  #   volumes:
+  #     - ../database/redis:/data:rw
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - ${REDIS_PORT}:6379
 
   rabbitmq-extr:
     image: 'rabbitmq:3.10-management'
     container_name: DoEx-rabbitmq-extraction-${NODE_ENV}
+    hostname: rabbitmq-extr
     restart: always
     volumes:
       - ../database/rabbitmq/rabbitmq-extraction-${NODE_ENV}:/data
@@ -32,13 +33,13 @@ services:
       - .env
     ports:
       - ${POSTGRES_PORT}:5432
-    #volumes:
-    #  - ../database/postgres/postgres-${NODE_ENV}:/var/lib/postgresql/data
+    volumes:
+     - ../database/postgres/postgres-${NODE_ENV}:/var/lib/postgresql/data
     healthcheck:
       test: exit 0
   
   service:
-    image: doex-service:latest
+    image: queue-list-service:latest
     container_name: 'DoEx-service-${NODE_ENV}'
     restart: always
     command: yarn start
