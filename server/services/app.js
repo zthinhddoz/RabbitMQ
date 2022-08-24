@@ -13,6 +13,8 @@ import * as Sentry from '@sentry/node';
 import routes from '~/gateway-api/routes';
 // import apolloServer from '~/gateway-api/graphql';
 import passport from '~/shared/passport';
+import ConsumerService from './AMPQCore/ConsumerService';
+import chalk from 'chalk';
 import Keycloak from 'keycloak-connect';
 import { NODE_ENV, SECRET, RATE_LIMIT, SENTRY_DSN, STATIC_FILES, RENDERTRON_URL } from './env';
 
@@ -37,7 +39,24 @@ app.use(
 const keycloak = new Keycloak({ store: memoryStore }, kcConfig);
 // listen to BLP RabbitMQ
 // let Receive = require('./AMPQ/receive');
-const Consumer = require('./AMPQCore/consumer');
+// const Consumer = require('./AMPQCore/consumer');
+const consumer = new ConsumerService();
+consumer.setConnection('UPLOAD_VIEWDOC');
+const consumerMethodUploadProtocol = new ConsumerService();
+consumerMethodUploadProtocol.setConnection('METHOD_UPLOAD', 'protocol');
+const consumerMethodUploadMail = new ConsumerService();
+consumerMethodUploadMail.setConnection('METHOD_UPLOAD', 'mail');
+const consumerMethodUploadDrive = new ConsumerService();
+consumerMethodUploadDrive.setConnection('METHOD_UPLOAD', 'drive');
+try {
+  console.log(chalk.hex('#009688')('🚀 Queue list: Established connection successfully.'));
+  consumer.initQueueList();
+  consumerMethodUploadProtocol.initQueueList();
+  consumerMethodUploadMail.initQueueList();
+  consumerMethodUploadDrive.initQueueList();
+} catch (err) {
+  console.log('Queue list error: ', err);
+}
 
 if (NODE_ENV === 'production') Sentry.init({ dsn: SENTRY_DSN });
 
