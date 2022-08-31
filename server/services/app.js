@@ -49,11 +49,11 @@ consumerMethodUploadMail.setConnection('METHOD_UPLOAD', 'mail');
 const consumerMethodUploadDrive = new ConsumerService();
 consumerMethodUploadDrive.setConnection('METHOD_UPLOAD', 'drive');
 try {
-  console.log(chalk.hex('#009688')('🚀 Queue list: Established connection successfully.'));
   consumer.initQueueList();
   consumerMethodUploadProtocol.initQueueList();
   consumerMethodUploadMail.initQueueList();
   consumerMethodUploadDrive.initQueueList();
+  console.log(chalk.hex('#009688')('🚀 Queue list: Established connection successfully.'));
 } catch (err) {
   console.log('Queue list error: ', err);
 }

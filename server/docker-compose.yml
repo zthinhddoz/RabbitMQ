@@ -14,11 +14,11 @@ services:
 
   rabbitmq-extr:
     image: 'rabbitmq:3.10-management'
-    container_name: DoEx-rabbitmq-extraction-${NODE_ENV}
+    container_name: 'DoEx-rabbitmq-extraction-${NODE_ENV}'
     hostname: rabbitmq-extr
     restart: always
     volumes:
-      - ../database/rabbitmq/rabbitmq-extraction-${NODE_ENV}:/data
+      - ../database/rabbitmq/rabbitmq-extraction-${NODE_ENV}:/var/lib/rabbitmq
     env_file:
       - .env
     ports:
@@ -49,8 +49,7 @@ services:
     env_file:
       - .env
     ports:
-      - 3000:3000
+      - 3001:3001
     tty: true
     depends_on:
-      postgres-db:
-        condition: service_healthy
+      - "rabbitmq-extr"
