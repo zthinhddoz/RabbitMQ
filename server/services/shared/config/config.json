@@ -42,7 +42,7 @@
     "username": "admin",
     "password": "Qwer1234",
     "database": "shinev2_staging",
-    "host": "10.0.26.100",
+    "host": "192.168.100.70",
     "port": "5554",
     "dialect": "postgres",
     "logging": false,

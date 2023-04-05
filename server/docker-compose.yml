@@ -29,6 +29,8 @@ services:
       driver: "json-file"
       options:
         max-size: "1G"
+    networks:
+      - shinev2_queuelist 
 
   postgres-db:
     image: 'postgres:11'
@@ -42,6 +44,8 @@ services:
      - ../database/postgres/postgres-${NODE_ENV}:/var/lib/postgresql/data
     healthcheck:
       test: exit 0
+    networks:
+      - shinev2_queuelist
   
   service:
     image: queue-list-service:latest
@@ -54,8 +58,18 @@ services:
     env_file:
       - .env
     ports:
-      - 3001:3001
+      - ${PORT}:7006
     tty: true
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "2"
+        max-size: 10m
     depends_on:
       rabbitmq-extr:
         condition: service_healthy
+    networks:
+      - shinev2_queuelist
+
+networks:
+  shinev2_queuelist:

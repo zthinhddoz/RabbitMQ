@@ -1,5 +1,5 @@
 FROM node:12
-EXPOSE 3000
+EXPOSE 3000 7006
 ENV HOME /document-extraction
 WORKDIR ${HOME}
 ADD . $HOME
